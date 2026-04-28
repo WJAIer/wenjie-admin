@@ -14,7 +14,7 @@ const ADMIN_PASSWORD = 'admin123';
 // 云函数基础URL
 const CLOUD_FUNCTION_BASE = 'https://cloud1-d7g8ol36z34e7a782-1426612389.ap-shanghai.app.tcloudbase.com';
 
-// 云函数路由映射（小写路径）
+// 云函数路由映射
 const CLOUD_FUNCTIONS = {
     // 案例
     getCases: 'getcases',
@@ -79,7 +79,8 @@ const ICON_MAP = {
  * @returns {Promise<object>} - 云函数返回结果
  */
 async function callCloudFunction(funcName, data = {}) {
-    const url = `${CLOUD_FUNCTION_BASE}/${funcName}`;
+    const route = CLOUD_FUNCTIONS[funcName];
+    const url = `${CLOUD_FUNCTION_BASE}/${route}`;
     
     try {
         const response = await fetch(url, {
@@ -100,233 +101,12 @@ async function callCloudFunction(funcName, data = {}) {
             throw new Error(result.message || '请求失败');
         }
         
-        return result;
+        return result.data;
     } catch (error) {
         console.error(`调用云函数 ${funcName} 失败:`, error);
         throw error;
     }
 }
-
-/**
- * 通用数据请求封装
- */
-const db = {
-    collection: (name) => ({
-        // 获取列表
-        get: async () => {
-            const funcMap = {
-                'cases': 'getCases',
-                'processes': 'getProcesses',
-                'materials': 'getMaterials',
-                'config': 'getConfig',
-                'case_detail': 'getCaseDetail',
-                'process_detail': 'getProcessDetail',
-                'material_detail': 'getMaterialDetail'
-            };
-            
-            const funcName = funcMap[name];
-            if (!funcName) {
-                throw new Error(`未知的集合: ${name}`);
-            }
-            
-            const result = await callCloudFunction(funcName, {});
-            return { data: result.data || [] };
-        },
-        
-        // 获取单个文档
-        doc: (id) => ({
-            get: async () => {
-                // 根据ID判断集合类型
-                let funcName, params;
-                
-                if (name === 'config') {
-                    funcName = 'getConfig';
-                    params = { docId: id };
-                } else if (name === 'case_detail' || id.startsWith('case_detail_')) {
-                    funcName = 'getCaseDetail';
-                    // 从case_detail ID中提取关联的case ID
-                    // 这里需要特殊处理，因为case_detail的ID格式是 case_detail_xxx
-                    const caseId = id.replace('case_detail_', '');
-                    params = { id: caseId }; // 后端会根据detailId查找
-                } else if (name === 'process_detail' || id.startsWith('process_detail_')) {
-                    funcName = 'getProcessDetail';
-                    const processId = id.replace('process_detail_', '');
-                    params = { id: processId };
-                } else if (name === 'material_detail' || id.startsWith('material_detail_')) {
-                    funcName = 'getMaterialDetail';
-                    const materialId = id.replace('material_detail_', '');
-                    params = { id: materialId };
-                } else if (name === 'cases') {
-                    funcName = 'getCaseDetail';
-                    params = { id };
-                } else if (name === 'processes') {
-                    funcName = 'getProcessDetail';
-                    params = { id };
-                } else if (name === 'materials') {
-                    funcName = 'getMaterialDetail';
-                    params = { id };
-                } else {
-                    throw new Error(`未知的集合或ID格式: ${name}/${id}`);
-                }
-                
-                const result = await callCloudFunction(funcName, params);
-                return { data: result.data };
-            },
-            
-            update: async (data) => {
-                let funcName, params;
-                
-                if (name === 'config') {
-                    funcName = 'saveConfig';
-                    params = { docId: id, ...data };
-                } else if (name.startsWith('case')) {
-                    funcName = 'saveCase';
-                    params = { id, ...data };
-                } else if (name.startsWith('process')) {
-                    funcName = 'saveProcess';
-                    params = { id, ...data };
-                } else if (name.startsWith('material')) {
-                    funcName = 'saveMaterial';
-                    params = { id, ...data };
-                } else {
-                    throw new Error(`未知的集合: ${name}`);
-                }
-                
-                return callCloudFunction(funcName, params);
-            },
-            
-            remove: async () => {
-                let funcName, params;
-                
-                if (name === 'cases') {
-                    funcName = 'deleteCase';
-                    params = { id };
-                } else if (name === 'processes') {
-                    funcName = 'deleteProcess';
-                    params = { id };
-                } else if (name === 'materials') {
-                    funcName = 'deleteMaterial';
-                    params = { id };
-                } else {
-                    throw new Error(`删除操作未支持集合: ${name}`);
-                }
-                
-                return callCloudFunction(funcName, params);
-            }
-        }),
-        
-        // 添加文档
-        add: async (data) => {
-            let funcName;
-            
-            if (name === 'cases') {
-                funcName = 'saveCase';
-            } else if (name === 'processes') {
-                funcName = 'saveProcess';
-            } else if (name === 'materials') {
-                funcName = 'saveMaterial';
-            } else if (name === 'config') {
-                funcName = 'saveConfig';
-            } else {
-                throw new Error(`添加操作未支持集合: ${name}`);
-            }
-            
-            return callCloudFunction(funcName, data);
-        },
-        
-        // 排序
-        orderBy: function(field, order) {
-            this._orderBy = { field, order };
-            return this;
-        },
-        
-        // 限制数量
-        limit: function(n) {
-            this._limit = n;
-            return this;
-        },
-        
-        // 跳过数量
-        skip: function(n) {
-            this._skip = n;
-            return this;
-        },
-        
-        // 计数（简化实现）
-        count: async () => {
-            const funcMap = {
-                'cases': 'getCases',
-                'processes': 'getProcesses',
-                'materials': 'getMaterials'
-            };
-            
-            const funcName = funcMap[name];
-            if (!funcName) {
-                return { total: 0 };
-            }
-            
-            const result = await callCloudFunction(funcName, {});
-            return { total: (result.data || []).length };
-        }
-    })
-};
-
-// ==================== 文件上传封装 ====================
-
-const app = {
-    uploadFile: async ({ cloudPath, filePath }) => {
-        try {
-            // 将文件转换为base64
-            let fileContent;
-            
-            if (filePath instanceof Blob) {
-                const arrayBuffer = await filePath.arrayBuffer();
-                const bytes = new Uint8Array(arrayBuffer);
-                let binary = '';
-                for (let i = 0; i < bytes.byteLength; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                fileContent = btoa(binary);
-            } else if (typeof filePath === 'string' && filePath.startsWith('data:')) {
-                // 已经是一个data URL
-                fileContent = filePath.split(',')[1];
-            } else {
-                throw new Error('不支持的文件格式');
-            }
-            
-            // 确定存储路径
-            const pathMap = {
-                'cases': 'cases',
-                'materials': 'materials',
-                'videos': 'videos',
-                'uploads': 'uploads'
-            };
-            
-            let uploadPath = 'uploads';
-            for (const [key, value] of Object.entries(pathMap)) {
-                if (cloudPath.includes(key)) {
-                    uploadPath = value;
-                    break;
-                }
-            }
-            
-            // 调用云函数上传
-            const result = await callCloudFunction('uploadFile', {
-                fileContent,
-                fileName: cloudPath.split('/').pop(),
-                path: uploadPath
-            });
-            
-            return {
-                fileID: result.data.fileID,
-                url: result.data.url
-            };
-        } catch (error) {
-            console.error('上传文件失败:', error);
-            throw error;
-        }
-    }
-};
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -350,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initCloud();
 });
 
-// ==================== 云开发初始化 ====================
+// ==================== 云函数连接测试 ====================
 async function initCloud() {
     try {
         // 测试云函数连接
@@ -468,16 +248,16 @@ function toggleSidebar() {
 async function loadDashboard() {
     try {
         // 获取案例数量
-        const casesRes = await db.collection('cases').count();
-        document.getElementById('case-count').textContent = casesRes.total;
+        const cases = await callCloudFunction('getCases');
+        document.getElementById('case-count').textContent = (cases || []).length;
         
         // 获取流程数量
-        const processesRes = await db.collection('processes').count();
-        document.getElementById('process-count').textContent = processesRes.total;
+        const processes = await callCloudFunction('getProcesses');
+        document.getElementById('process-count').textContent = (processes || []).length;
         
         // 获取资料数量
-        const materialsRes = await db.collection('materials').count();
-        document.getElementById('material-count').textContent = materialsRes.total;
+        const materials = await callCloudFunction('getMaterials');
+        document.getElementById('material-count').textContent = (materials || []).length;
     } catch (error) {
         console.error('加载仪表盘失败:', error);
     }
@@ -488,16 +268,15 @@ async function loadDashboard() {
 // 启动页配置
 async function loadSplashConfig() {
     try {
-        const res = await db.collection('config').doc('global').get();
-        const config = res.data || {};
-        const splash = config.splash || {};
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
+        const splash = config?.splash || {};
         
         document.getElementById('splash-logo').value = splash.logo || '';
         document.getElementById('splash-subtitle').value = splash.subtitle || '';
         document.getElementById('splash-brand').value = splash.brandText || '';
         
         // 显示已有视频
-        if (config.splashVideo) {
+        if (config?.splashVideo) {
             showUploadPreview('splash-video-area', config.splashVideo, 'video');
         }
     } catch (error) {
@@ -522,7 +301,7 @@ async function saveSplashConfig() {
             data.splashVideo = uploadedFiles['splashVideo'];
         }
         
-        await db.collection('config').doc('global').update(data);
+        await callCloudFunction('saveConfig', { docId: 'global', ...data });
         
         showToast('启动页配置已保存');
     } catch (error) {
@@ -536,9 +315,8 @@ async function saveSplashConfig() {
 // 首页配置
 async function loadHomeConfig() {
     try {
-        const res = await db.collection('config').doc('global').get();
-        const config = res.data || {};
-        const home = config.home || {};
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
+        const home = config?.home || {};
         
         document.getElementById('home-brand-en').value = home.brandName || '';
         document.getElementById('home-brand-cn').value = home.brandNameCn || '';
@@ -604,7 +382,7 @@ async function saveHomeConfig() {
             }
         };
         
-        await db.collection('config').doc('global').update(data);
+        await callCloudFunction('saveConfig', { docId: 'global', ...data });
         
         showToast('首页配置已保存');
     } catch (error) {
@@ -618,9 +396,8 @@ async function saveHomeConfig() {
 // 底部导航栏配置
 async function loadTabBarConfig() {
     try {
-        const res = await db.collection('config').doc('global').get();
-        const config = res.data || {};
-        const tabBar = config.tabBar || [];
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
+        const tabBar = config?.tabBar || [];
         
         renderTabBarList(tabBar);
     } catch (error) {
@@ -660,9 +437,7 @@ async function saveTabBarConfig() {
     try {
         showLoading(true);
         
-        await db.collection('config').doc('global').update({
-            tabBar: window.currentTabBar || []
-        });
+        await callCloudFunction('saveConfig', { docId: 'global', tabBar: window.currentTabBar || [] });
         
         showToast('导航栏配置已保存');
     } catch (error) {
@@ -676,20 +451,19 @@ async function saveTabBarConfig() {
 // 全局背景配置
 async function loadGlobalConfig() {
     try {
-        const res = await db.collection('config').doc('global').get();
-        const config = res.data || {};
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
         
         // 设置背景类型
-        const bgType = config.backgroundType || 'image';
+        const bgType = config?.backgroundType || 'image';
         const radio = document.querySelector(`input[name="bgType"][value="${bgType}"]`);
         if (radio) radio.checked = true;
         toggleBgType(bgType);
         
         // 显示已有背景
-        if (config.backgroundImage) {
+        if (config?.backgroundImage) {
             showUploadPreview('bg-image-area', config.backgroundImage, 'image');
         }
-        if (config.backgroundVideo) {
+        if (config?.backgroundVideo) {
             showUploadPreview('bg-video-area', config.backgroundVideo, 'video');
         }
     } catch (error) {
@@ -728,7 +502,7 @@ async function saveGlobalConfig() {
             data.backgroundVideo = uploadedFiles['backgroundVideo'];
         }
         
-        await db.collection('config').doc('global').update(data);
+        await callCloudFunction('saveConfig', { docId: 'global', ...data });
         
         showToast('全局背景配置已保存');
     } catch (error) {
@@ -742,9 +516,8 @@ async function saveGlobalConfig() {
 // 分享配置
 async function loadShareConfig() {
     try {
-        const res = await db.collection('config').doc('global').get();
-        const config = res.data || {};
-        const shareConfig = config.shareConfig || {};
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
+        const shareConfig = config?.shareConfig || {};
         
         document.getElementById('share-default-title').value = shareConfig.defaultTitle || '';
         
@@ -770,7 +543,7 @@ async function saveShareConfig() {
             data.shareConfig.defaultImage = uploadedFiles['shareDefaultImage'];
         }
         
-        await db.collection('config').doc('global').update(data);
+        await callCloudFunction('saveConfig', { docId: 'global', ...data });
         
         showToast('分享配置已保存');
     } catch (error) {
@@ -784,10 +557,8 @@ async function saveShareConfig() {
 // ==================== 案例管理 ====================
 async function loadCases() {
     try {
-        const res = await db.collection('cases').get();
-        const cases = res.data || [];
-        
-        renderCasesTable(cases);
+        const cases = await callCloudFunction('getCases');
+        renderCasesTable(cases || []);
     } catch (error) {
         console.error('加载案例列表失败:', error);
         showToast('加载数据失败', 'error');
@@ -850,8 +621,7 @@ function openCaseModal(id = null) {
 
 async function loadCaseForEdit(id) {
     try {
-        const res = await db.collection('cases').doc(id).get();
-        const item = res.data;
+        const item = await callCloudFunction('getCaseDetail', { id });
         
         document.getElementById('case-edit-title').value = item.title || '';
         document.getElementById('case-edit-desc').value = item.desc || '';
@@ -894,14 +664,14 @@ async function saveCase() {
         }
         
         if (id) {
-            await db.collection('cases').doc(id).update(data);
+            await callCloudFunction('saveCase', { id, ...data });
         } else {
             // 新增案例（会同时创建详情）
             data.detail = {
                 title: title,
                 contentBlocks: []
             };
-            await db.collection('cases').add(data);
+            await callCloudFunction('saveCase', { ...data });
         }
         
         closeModal('case-modal');
@@ -921,7 +691,7 @@ async function deleteCase(id) {
     try {
         showLoading(true);
         
-        await db.collection('cases').doc(id).remove();
+        await callCloudFunction('deleteCase', { id });
         
         loadCases();
         showToast('案例已删除');
@@ -936,12 +706,11 @@ async function deleteCase(id) {
 // ==================== 案例详情编辑 ====================
 async function loadCaseDetailSelector() {
     try {
-        const res = await db.collection('cases').get();
-        const cases = res.data || [];
+        const cases = await callCloudFunction('getCases');
         
         const selector = document.getElementById('case-detail-selector');
         selector.innerHTML = '<option value="">-- 选择案例 --</option>' + 
-            cases.map(item => `<option value="${item._id}">${item.title}</option>`).join('');
+            (cases || []).map(item => `<option value="${item._id}">${item.title}</option>`).join('');
     } catch (error) {
         console.error('加载案例选择器失败:', error);
     }
@@ -953,9 +722,8 @@ async function loadCaseDetail() {
     
     try {
         // 获取案例信息（包括详情）
-        const res = await db.collection('cases').doc(caseId).get();
-        const caseData = res.data;
-        const detail = caseData.detail || {};
+        const caseData = await callCloudFunction('getCaseDetail', { id: caseId });
+        const detail = caseData?.detail || {};
         
         // 填充基本信息
         document.getElementById('case-title').value = detail.title || '';
@@ -1135,10 +903,7 @@ async function uploadBlockImage(blockIndex, input) {
         
         // 上传到云存储
         const path = `cases/images/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -1166,10 +931,7 @@ async function uploadMultiBlockImage(blockIndex, imgIndex, input) {
         
         // 上传到云存储
         const path = `cases/images/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -1202,8 +964,7 @@ async function saveCaseDetail() {
         showLoading(true);
         
         // 获取案例信息
-        const caseRes = await db.collection('cases').doc(caseId).get();
-        const caseData = caseRes.data;
+        const caseData = await callCloudFunction('getCaseDetail', { id: caseId });
         
         const data = {
             title: document.getElementById('case-title').value,
@@ -1223,7 +984,7 @@ async function saveCaseDetail() {
         }
         
         // 更新详情
-        await db.collection('case_detail').doc(caseData.detailId).update(data);
+        await callCloudFunction('saveCase', { id: caseId, ...data });
         
         showToast('案例详情已保存');
     } catch (error) {
@@ -1237,10 +998,8 @@ async function saveCaseDetail() {
 // ==================== 流程管理 ====================
 async function loadProcesses() {
     try {
-        const res = await db.collection('processes').get();
-        const processes = res.data || [];
-        
-        renderProcessesTable(processes);
+        const processes = await callCloudFunction('getProcesses');
+        renderProcessesTable(processes || []);
     } catch (error) {
         console.error('加载流程列表失败:', error);
     }
@@ -1300,8 +1059,7 @@ function openProcessModal(id = null) {
 
 async function loadProcessForEdit(id) {
     try {
-        const res = await db.collection('processes').doc(id).get();
-        const item = res.data;
+        const item = await callCloudFunction('getProcessDetail', { id });
         
         document.getElementById('process-edit-title').value = item.title || '';
         document.getElementById('process-edit-desc').value = item.desc || '';
@@ -1335,14 +1093,14 @@ async function saveProcess() {
         };
         
         if (id) {
-            await db.collection('processes').doc(id).update(data);
+            await callCloudFunction('saveProcess', { id, ...data });
         } else {
             // 新增流程（会同时创建详情）
             data.detail = {
                 title: data.title,
                 steps: []
             };
-            await db.collection('processes').add(data);
+            await callCloudFunction('saveProcess', { ...data });
         }
         
         closeModal('process-modal');
@@ -1362,7 +1120,7 @@ async function deleteProcess(id) {
     try {
         showLoading(true);
         
-        await db.collection('processes').doc(id).remove();
+        await callCloudFunction('deleteProcess', { id });
         
         loadProcesses();
         showToast('流程已删除');
@@ -1377,12 +1135,11 @@ async function deleteProcess(id) {
 // ==================== 流程详情编辑 ====================
 async function loadProcessDetailSelector() {
     try {
-        const res = await db.collection('processes').get();
-        const processes = res.data || [];
+        const processes = await callCloudFunction('getProcesses');
         
         const selector = document.getElementById('process-detail-selector');
         selector.innerHTML = '<option value="">-- 选择流程 --</option>' + 
-            processes.map(item => `<option value="${item._id}">${item.title}</option>`).join('');
+            (processes || []).map(item => `<option value="${item._id}">${item.title}</option>`).join('');
     } catch (error) {
         console.error('加载流程选择器失败:', error);
     }
@@ -1393,9 +1150,8 @@ async function loadProcessDetail() {
     if (!processId) return;
     
     try {
-        const res = await db.collection('processes').doc(processId).get();
-        const processData = res.data;
-        const detail = processData.detail || {};
+        const processData = await callCloudFunction('getProcessDetail', { id: processId });
+        const detail = processData?.detail || {};
         
         document.getElementById('process-title').value = detail.title || '';
         document.getElementById('process-subtitle').value = detail.subtitle || '';
@@ -1514,9 +1270,6 @@ async function saveProcessDetail() {
     try {
         showLoading(true);
         
-        const processRes = await db.collection('processes').doc(processId).get();
-        const processData = processRes.data;
-        
         const data = {
             title: document.getElementById('process-title').value,
             subtitle: document.getElementById('process-subtitle').value,
@@ -1530,7 +1283,7 @@ async function saveProcessDetail() {
             data.heroImage = uploadedFiles['processHeroImage'];
         }
         
-        await db.collection('process_detail').doc(processData.detailId).update(data);
+        await callCloudFunction('saveProcess', { id: processId, ...data });
         
         showToast('流程详情已保存');
     } catch (error) {
@@ -1544,10 +1297,8 @@ async function saveProcessDetail() {
 // ==================== 资料管理 ====================
 async function loadMaterials() {
     try {
-        const res = await db.collection('materials').get();
-        const materials = res.data || [];
-        
-        renderMaterialsTable(materials);
+        const materials = await callCloudFunction('getMaterials');
+        renderMaterialsTable(materials || []);
     } catch (error) {
         console.error('加载资料列表失败:', error);
     }
@@ -1604,8 +1355,7 @@ function openMaterialModal(id = null) {
 
 async function loadMaterialForEdit(id) {
     try {
-        const res = await db.collection('materials').doc(id).get();
-        const item = res.data;
+        const item = await callCloudFunction('getMaterialDetail', { id });
         
         document.getElementById('material-edit-title').value = item.title || '';
         document.getElementById('material-edit-desc').value = item.desc || '';
@@ -1633,13 +1383,13 @@ async function saveMaterial() {
         };
         
         if (id) {
-            await db.collection('materials').doc(id).update(data);
+            await callCloudFunction('saveMaterial', { id, ...data });
         } else {
             // 新增资料（会同时创建详情）
             data.detail = {
                 contentBlocks: []
             };
-            await db.collection('materials').add(data);
+            await callCloudFunction('saveMaterial', { ...data });
         }
         
         closeModal('material-modal');
@@ -1659,7 +1409,7 @@ async function deleteMaterial(id) {
     try {
         showLoading(true);
         
-        await db.collection('materials').doc(id).remove();
+        await callCloudFunction('deleteMaterial', { id });
         
         loadMaterials();
         showToast('资料已删除');
@@ -1674,12 +1424,11 @@ async function deleteMaterial(id) {
 // ==================== 资料详情编辑 ====================
 async function loadMaterialDetailSelector() {
     try {
-        const res = await db.collection('materials').get();
-        const materials = res.data || [];
+        const materials = await callCloudFunction('getMaterials');
         
         const selector = document.getElementById('material-detail-selector');
         selector.innerHTML = '<option value="">-- 选择资料 --</option>' + 
-            materials.map(item => `<option value="${item._id}">${item.title}</option>`).join('');
+            (materials || []).map(item => `<option value="${item._id}">${item.title}</option>`).join('');
     } catch (error) {
         console.error('加载资料选择器失败:', error);
     }
@@ -1690,9 +1439,8 @@ async function loadMaterialDetail() {
     if (!materialId) return;
     
     try {
-        const res = await db.collection('materials').doc(materialId).get();
-        const materialData = res.data;
-        const detail = materialData.detail || {};
+        const materialData = await callCloudFunction('getMaterialDetail', { id: materialId });
+        const detail = materialData?.detail || {};
         
         document.getElementById('material-share-title').value = detail.shareTitle || '';
         
@@ -1855,10 +1603,7 @@ async function uploadMaterialBlockImage(blockIndex, input) {
         showLoading(true);
         
         const path = `materials/images/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -1884,10 +1629,7 @@ async function uploadMaterialMultiBlockImage(blockIndex, imgIndex, input) {
         showLoading(true);
         
         const path = `materials/images/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -1918,9 +1660,6 @@ async function saveMaterialDetail() {
     try {
         showLoading(true);
         
-        const materialRes = await db.collection('materials').doc(materialId).get();
-        const materialData = materialRes.data;
-        
         const data = {
             shareTitle: document.getElementById('material-share-title').value,
             contentBlocks: window.currentMaterialContentBlocks || []
@@ -1930,7 +1669,7 @@ async function saveMaterialDetail() {
             data.heroImage = uploadedFiles['materialHeroImage'];
         }
         
-        await db.collection('material_detail').doc(materialData.detailId).update(data);
+        await callCloudFunction('saveMaterial', { id: materialId, ...data });
         
         showToast('资料详情已保存');
     } catch (error) {
@@ -1938,6 +1677,60 @@ async function saveMaterialDetail() {
         showToast('保存失败，请重试', 'error');
     } finally {
         showLoading(false);
+    }
+}
+
+// ==================== 文件上传 ====================
+async function uploadImage(cloudPath, file) {
+    try {
+        // 将文件转换为base64
+        let fileContent;
+        
+        if (file instanceof Blob) {
+            const arrayBuffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            fileContent = btoa(binary);
+        } else if (typeof file === 'string' && file.startsWith('data:')) {
+            // 已经是一个data URL
+            fileContent = file.split(',')[1];
+        } else {
+            throw new Error('不支持的文件格式');
+        }
+        
+        // 确定存储路径
+        const pathMap = {
+            'cases': 'cases',
+            'materials': 'materials',
+            'videos': 'videos',
+            'uploads': 'uploads'
+        };
+        
+        let uploadPath = 'uploads';
+        for (const [key, value] of Object.entries(pathMap)) {
+            if (cloudPath.includes(key)) {
+                uploadPath = value;
+                break;
+            }
+        }
+        
+        // 调用云函数上传
+        const result = await callCloudFunction('uploadFile', {
+            fileContent,
+            fileName: cloudPath.split('/').pop(),
+            path: uploadPath
+        });
+        
+        return {
+            fileID: result.fileID,
+            url: result.url
+        };
+    } catch (error) {
+        console.error('上传文件失败:', error);
+        throw error;
     }
 }
 
@@ -1951,10 +1744,7 @@ async function handleImageUpload(input, key) {
         
         // 上传到云存储
         const path = `uploads/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -1983,10 +1773,7 @@ async function handleVideoUpload(input, key) {
         
         // 上传到云存储
         const path = `videos/${Date.now()}_${file.name}`;
-        const uploadRes = await app.uploadFile({
-            cloudPath: path,
-            filePath: file
-        });
+        const uploadRes = await uploadImage(path, file);
         
         const fileUrl = uploadRes.url || uploadRes.fileID;
         
@@ -2111,12 +1898,12 @@ function showLoading(show) {
 async function initGlobalConfig() {
     try {
         // 检查全局配置是否存在
-        const res = await db.collection('config').doc('global').get();
+        const config = await callCloudFunction('getConfig', { docId: 'global' });
         
-        if (!res.data || !res.data._id) {
+        if (!config || !config._id) {
             // 创建默认配置
-            await db.collection('config').add({
-                _id: 'global',
+            await callCloudFunction('saveConfig', {
+                docId: 'global',
                 backgroundType: 'image',
                 backgroundImage: '',
                 backgroundVideo: '',
