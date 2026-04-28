@@ -1,16 +1,42 @@
 /**
  * 问介AIer后台管理系统 - 应用逻辑
+ * 云函数HTTP调用版本
  * 云开发环境ID: cloud1-d7g8ol36z34e7a782
  */
 
 // ==================== 全局变量 ====================
-let app = null;
-let db = null;
 let currentUser = null;
 let uploadedFiles = {}; // 存储已上传的文件信息
 
 // 默认管理员密码（生产环境应修改）
 const ADMIN_PASSWORD = 'admin123';
+
+// 云函数基础URL
+const CLOUD_FUNCTION_BASE = 'https://cloud1-d7g8ol36z34e7a782-1426612389.ap-shanghai.app.tcloudbase.com';
+
+// 云函数路由映射（小写路径）
+const CLOUD_FUNCTIONS = {
+    // 案例
+    getCases: 'getcases',
+    getCaseDetail: 'getcasedetail',
+    saveCase: 'savecase',
+    deleteCase: 'deletecase',
+    // 流程
+    getProcesses: 'getprocesses',
+    getProcessDetail: 'getprocessdetail',
+    saveProcess: 'saveprocess',
+    deleteProcess: 'deleteprocess',
+    // 资料
+    getMaterials: 'getmaterials',
+    getMaterialDetail: 'getmaterialdetail',
+    saveMaterial: 'savematerial',
+    deleteMaterial: 'deletematerial',
+    // 配置
+    getConfig: 'getconfig',
+    saveConfig: 'saveconfig',
+    // 文件上传
+    uploadFile: 'uploadfile'
+};
 
 // 图标映射
 const ICON_MAP = {
@@ -44,6 +70,264 @@ const ICON_MAP = {
     materials: '📚'
 };
 
+// ==================== 云函数HTTP调用封装 ====================
+
+/**
+ * 调用云函数
+ * @param {string} funcName - 云函数名称
+ * @param {object} data - 请求参数
+ * @returns {Promise<object>} - 云函数返回结果
+ */
+async function callCloudFunction(funcName, data = {}) {
+    const url = `${CLOUD_FUNCTION_BASE}/${funcName}`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.code !== 0) {
+            throw new Error(result.message || '请求失败');
+        }
+        
+        return result;
+    } catch (error) {
+        console.error(`调用云函数 ${funcName} 失败:`, error);
+        throw error;
+    }
+}
+
+/**
+ * 通用数据请求封装
+ */
+const db = {
+    collection: (name) => ({
+        // 获取列表
+        get: async () => {
+            const funcMap = {
+                'cases': 'getCases',
+                'processes': 'getProcesses',
+                'materials': 'getMaterials',
+                'config': 'getConfig',
+                'case_detail': 'getCaseDetail',
+                'process_detail': 'getProcessDetail',
+                'material_detail': 'getMaterialDetail'
+            };
+            
+            const funcName = funcMap[name];
+            if (!funcName) {
+                throw new Error(`未知的集合: ${name}`);
+            }
+            
+            const result = await callCloudFunction(funcName, {});
+            return { data: result.data || [] };
+        },
+        
+        // 获取单个文档
+        doc: (id) => ({
+            get: async () => {
+                // 根据ID判断集合类型
+                let funcName, params;
+                
+                if (name === 'config') {
+                    funcName = 'getConfig';
+                    params = { docId: id };
+                } else if (name === 'case_detail' || id.startsWith('case_detail_')) {
+                    funcName = 'getCaseDetail';
+                    // 从case_detail ID中提取关联的case ID
+                    // 这里需要特殊处理，因为case_detail的ID格式是 case_detail_xxx
+                    const caseId = id.replace('case_detail_', '');
+                    params = { id: caseId }; // 后端会根据detailId查找
+                } else if (name === 'process_detail' || id.startsWith('process_detail_')) {
+                    funcName = 'getProcessDetail';
+                    const processId = id.replace('process_detail_', '');
+                    params = { id: processId };
+                } else if (name === 'material_detail' || id.startsWith('material_detail_')) {
+                    funcName = 'getMaterialDetail';
+                    const materialId = id.replace('material_detail_', '');
+                    params = { id: materialId };
+                } else if (name === 'cases') {
+                    funcName = 'getCaseDetail';
+                    params = { id };
+                } else if (name === 'processes') {
+                    funcName = 'getProcessDetail';
+                    params = { id };
+                } else if (name === 'materials') {
+                    funcName = 'getMaterialDetail';
+                    params = { id };
+                } else {
+                    throw new Error(`未知的集合或ID格式: ${name}/${id}`);
+                }
+                
+                const result = await callCloudFunction(funcName, params);
+                return { data: result.data };
+            },
+            
+            update: async (data) => {
+                let funcName, params;
+                
+                if (name === 'config') {
+                    funcName = 'saveConfig';
+                    params = { docId: id, ...data };
+                } else if (name.startsWith('case')) {
+                    funcName = 'saveCase';
+                    params = { id, ...data };
+                } else if (name.startsWith('process')) {
+                    funcName = 'saveProcess';
+                    params = { id, ...data };
+                } else if (name.startsWith('material')) {
+                    funcName = 'saveMaterial';
+                    params = { id, ...data };
+                } else {
+                    throw new Error(`未知的集合: ${name}`);
+                }
+                
+                return callCloudFunction(funcName, params);
+            },
+            
+            remove: async () => {
+                let funcName, params;
+                
+                if (name === 'cases') {
+                    funcName = 'deleteCase';
+                    params = { id };
+                } else if (name === 'processes') {
+                    funcName = 'deleteProcess';
+                    params = { id };
+                } else if (name === 'materials') {
+                    funcName = 'deleteMaterial';
+                    params = { id };
+                } else {
+                    throw new Error(`删除操作未支持集合: ${name}`);
+                }
+                
+                return callCloudFunction(funcName, params);
+            }
+        }),
+        
+        // 添加文档
+        add: async (data) => {
+            let funcName;
+            
+            if (name === 'cases') {
+                funcName = 'saveCase';
+            } else if (name === 'processes') {
+                funcName = 'saveProcess';
+            } else if (name === 'materials') {
+                funcName = 'saveMaterial';
+            } else if (name === 'config') {
+                funcName = 'saveConfig';
+            } else {
+                throw new Error(`添加操作未支持集合: ${name}`);
+            }
+            
+            return callCloudFunction(funcName, data);
+        },
+        
+        // 排序
+        orderBy: function(field, order) {
+            this._orderBy = { field, order };
+            return this;
+        },
+        
+        // 限制数量
+        limit: function(n) {
+            this._limit = n;
+            return this;
+        },
+        
+        // 跳过数量
+        skip: function(n) {
+            this._skip = n;
+            return this;
+        },
+        
+        // 计数（简化实现）
+        count: async () => {
+            const funcMap = {
+                'cases': 'getCases',
+                'processes': 'getProcesses',
+                'materials': 'getMaterials'
+            };
+            
+            const funcName = funcMap[name];
+            if (!funcName) {
+                return { total: 0 };
+            }
+            
+            const result = await callCloudFunction(funcName, {});
+            return { total: (result.data || []).length };
+        }
+    })
+};
+
+// ==================== 文件上传封装 ====================
+
+const app = {
+    uploadFile: async ({ cloudPath, filePath }) => {
+        try {
+            // 将文件转换为base64
+            let fileContent;
+            
+            if (filePath instanceof Blob) {
+                const arrayBuffer = await filePath.arrayBuffer();
+                const bytes = new Uint8Array(arrayBuffer);
+                let binary = '';
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                fileContent = btoa(binary);
+            } else if (typeof filePath === 'string' && filePath.startsWith('data:')) {
+                // 已经是一个data URL
+                fileContent = filePath.split(',')[1];
+            } else {
+                throw new Error('不支持的文件格式');
+            }
+            
+            // 确定存储路径
+            const pathMap = {
+                'cases': 'cases',
+                'materials': 'materials',
+                'videos': 'videos',
+                'uploads': 'uploads'
+            };
+            
+            let uploadPath = 'uploads';
+            for (const [key, value] of Object.entries(pathMap)) {
+                if (cloudPath.includes(key)) {
+                    uploadPath = value;
+                    break;
+                }
+            }
+            
+            // 调用云函数上传
+            const result = await callCloudFunction('uploadFile', {
+                fileContent,
+                fileName: cloudPath.split('/').pop(),
+                path: uploadPath
+            });
+            
+            return {
+                fileID: result.data.fileID,
+                url: result.data.url
+            };
+        } catch (error) {
+            console.error('上传文件失败:', error);
+            throw error;
+        }
+    }
+};
+
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', async () => {
     // 检查是否已登录
@@ -62,44 +346,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.addEventListener('click', handleNavClick);
     });
     
-    // 初始化云开发
+    // 初始化云函数连接
     await initCloud();
 });
 
 // ==================== 云开发初始化 ====================
 async function initCloud() {
     try {
-        // 使用微信云开发Web SDK初始化
-        // 注意：需要在云开发控制台 → 设置 → 安全设置 中添加当前域名到Web SDK安全域名
-        
-        app = cloudbase.init({
-            env: 'cloud1-d7g8ol36z34e7a782'
-        });
-        
-        // 先检查是否已登录
-        const loginState = await app.auth().getLoginState();
-        
-        if (!loginState) {
-            // 未登录，尝试匿名登录
-            try {
-                await app.auth().anonymousAuthProvider().signIn();
-                console.log('匿名登录成功');
-            } catch (anonError) {
-                console.error('匿名登录失败，尝试自定义登录:', anonError);
-                // 如果匿名登录失败，可能需要自定义登录
-                showToast('请先在云开发控制台添加安全域名: wjaier.github.io', 'error');
-                return;
-            }
-        }
-        
-        // 获取数据库引用
-        db = app.database();
-        
-        console.log('云开发初始化成功');
-        showToast('云开发连接成功');
+        // 测试云函数连接
+        await callCloudFunction('getConfig', { docId: 'global' });
+        console.log('云函数连接成功');
+        showToast('云函数连接成功');
     } catch (error) {
-        console.error('云开发初始化失败:', error);
-        showToast('云开发连接失败，请先在控制台添加安全域名', 'error');
+        console.error('云函数连接失败:', error);
+        showToast('云函数连接失败，请检查配置', 'error');
     }
 }
 
@@ -229,7 +489,7 @@ async function loadDashboard() {
 async function loadSplashConfig() {
     try {
         const res = await db.collection('config').doc('global').get();
-        const config = res.data[0] || {};
+        const config = res.data || {};
         const splash = config.splash || {};
         
         document.getElementById('splash-logo').value = splash.logo || '';
@@ -277,7 +537,7 @@ async function saveSplashConfig() {
 async function loadHomeConfig() {
     try {
         const res = await db.collection('config').doc('global').get();
-        const config = res.data[0] || {};
+        const config = res.data || {};
         const home = config.home || {};
         
         document.getElementById('home-brand-en').value = home.brandName || '';
@@ -359,7 +619,7 @@ async function saveHomeConfig() {
 async function loadTabBarConfig() {
     try {
         const res = await db.collection('config').doc('global').get();
-        const config = res.data[0] || {};
+        const config = res.data || {};
         const tabBar = config.tabBar || [];
         
         renderTabBarList(tabBar);
@@ -417,11 +677,12 @@ async function saveTabBarConfig() {
 async function loadGlobalConfig() {
     try {
         const res = await db.collection('config').doc('global').get();
-        const config = res.data[0] || {};
+        const config = res.data || {};
         
         // 设置背景类型
         const bgType = config.backgroundType || 'image';
-        document.querySelector(`input[name="bgType"][value="${bgType}"]`).checked = true;
+        const radio = document.querySelector(`input[name="bgType"][value="${bgType}"]`);
+        if (radio) radio.checked = true;
         toggleBgType(bgType);
         
         // 显示已有背景
@@ -482,7 +743,7 @@ async function saveGlobalConfig() {
 async function loadShareConfig() {
     try {
         const res = await db.collection('config').doc('global').get();
-        const config = res.data[0] || {};
+        const config = res.data || {};
         const shareConfig = config.shareConfig || {};
         
         document.getElementById('share-default-title').value = shareConfig.defaultTitle || '';
@@ -523,7 +784,7 @@ async function saveShareConfig() {
 // ==================== 案例管理 ====================
 async function loadCases() {
     try {
-        const res = await db.collection('cases').orderBy('order', 'asc').get();
+        const res = await db.collection('cases').get();
         const cases = res.data || [];
         
         renderCasesTable(cases);
@@ -624,8 +885,7 @@ async function saveCase() {
             title,
             desc,
             tags,
-            order,
-            updateTime: Date.now()
+            order
         };
         
         // 如果有新上传的封面
@@ -636,21 +896,12 @@ async function saveCase() {
         if (id) {
             await db.collection('cases').doc(id).update(data);
         } else {
-            // 新增案例
-            const caseId = 'case_' + Date.now();
-            data._id = caseId;
-            data.detailId = 'case_detail_' + Date.now();
-            data.createTime = Date.now();
-            
-            await db.collection('cases').add(data);
-            
-            // 同时创建空的详情
-            await db.collection('case_detail').add({
-                _id: data.detailId,
-                caseId: caseId,
+            // 新增案例（会同时创建详情）
+            data.detail = {
                 title: title,
                 contentBlocks: []
-            });
+            };
+            await db.collection('cases').add(data);
         }
         
         closeModal('case-modal');
@@ -670,17 +921,7 @@ async function deleteCase(id) {
     try {
         showLoading(true);
         
-        // 获取案例信息
-        const caseRes = await db.collection('cases').doc(id).get();
-        const caseData = caseRes.data;
-        
-        // 删除案例
         await db.collection('cases').doc(id).remove();
-        
-        // 删除关联的详情
-        if (caseData && caseData.detailId) {
-            await db.collection('case_detail').doc(caseData.detailId).remove();
-        }
         
         loadCases();
         showToast('案例已删除');
@@ -695,7 +936,7 @@ async function deleteCase(id) {
 // ==================== 案例详情编辑 ====================
 async function loadCaseDetailSelector() {
     try {
-        const res = await db.collection('cases').orderBy('order', 'asc').get();
+        const res = await db.collection('cases').get();
         const cases = res.data || [];
         
         const selector = document.getElementById('case-detail-selector');
@@ -711,13 +952,10 @@ async function loadCaseDetail() {
     if (!caseId) return;
     
     try {
-        // 获取案例信息
-        const caseRes = await db.collection('cases').doc(caseId).get();
-        const caseData = caseRes.data;
-        
-        // 获取详情信息
-        const detailRes = await db.collection('case_detail').doc(caseData.detailId).get();
-        const detail = detailRes.data || {};
+        // 获取案例信息（包括详情）
+        const res = await db.collection('cases').doc(caseId).get();
+        const caseData = res.data;
+        const detail = caseData.detail || {};
         
         // 填充基本信息
         document.getElementById('case-title').value = detail.title || '';
@@ -902,7 +1140,7 @@ async function uploadBlockImage(blockIndex, input) {
             filePath: file
         });
         
-        const fileUrl = uploadRes.fileID;
+        const fileUrl = uploadRes.url || uploadRes.fileID;
         
         // 更新内容块
         if (window.currentContentBlocks && window.currentContentBlocks[blockIndex]) {
@@ -933,7 +1171,7 @@ async function uploadMultiBlockImage(blockIndex, imgIndex, input) {
             filePath: file
         });
         
-        const fileUrl = uploadRes.fileID;
+        const fileUrl = uploadRes.url || uploadRes.fileID;
         
         // 更新内容块
         if (window.currentContentBlocks && window.currentContentBlocks[blockIndex]) {
@@ -973,8 +1211,7 @@ async function saveCaseDetail() {
             intro: document.getElementById('case-intro').value,
             quote: document.getElementById('case-quote').value,
             shareTitle: document.getElementById('case-share-title').value,
-            contentBlocks: window.currentContentBlocks || [],
-            updateTime: Date.now()
+            contentBlocks: window.currentContentBlocks || []
         };
         
         // 如果有新上传的图片
@@ -1000,7 +1237,7 @@ async function saveCaseDetail() {
 // ==================== 流程管理 ====================
 async function loadProcesses() {
     try {
-        const res = await db.collection('processes').orderBy('order', 'asc').get();
+        const res = await db.collection('processes').get();
         const processes = res.data || [];
         
         renderProcessesTable(processes);
@@ -1094,27 +1331,18 @@ async function saveProcess() {
             duration: document.getElementById('process-edit-duration').value,
             delivery: document.getElementById('process-edit-delivery').value,
             slogan: document.getElementById('process-edit-slogan').value,
-            order: parseInt(document.getElementById('process-edit-order').value) || 1,
-            updateTime: Date.now()
+            order: parseInt(document.getElementById('process-edit-order').value) || 1
         };
         
         if (id) {
             await db.collection('processes').doc(id).update(data);
         } else {
-            const processId = 'process_' + Date.now();
-            data._id = processId;
-            data.detailId = 'process_detail_' + Date.now();
-            data.createTime = Date.now();
-            
-            await db.collection('processes').add(data);
-            
-            // 同时创建空的详情
-            await db.collection('process_detail').add({
-                _id: data.detailId,
-                processId: processId,
+            // 新增流程（会同时创建详情）
+            data.detail = {
                 title: data.title,
                 steps: []
-            });
+            };
+            await db.collection('processes').add(data);
         }
         
         closeModal('process-modal');
@@ -1134,14 +1362,7 @@ async function deleteProcess(id) {
     try {
         showLoading(true);
         
-        const processRes = await db.collection('processes').doc(id).get();
-        const processData = processRes.data;
-        
         await db.collection('processes').doc(id).remove();
-        
-        if (processData && processData.detailId) {
-            await db.collection('process_detail').doc(processData.detailId).remove();
-        }
         
         loadProcesses();
         showToast('流程已删除');
@@ -1156,7 +1377,7 @@ async function deleteProcess(id) {
 // ==================== 流程详情编辑 ====================
 async function loadProcessDetailSelector() {
     try {
-        const res = await db.collection('processes').orderBy('order', 'asc').get();
+        const res = await db.collection('processes').get();
         const processes = res.data || [];
         
         const selector = document.getElementById('process-detail-selector');
@@ -1172,11 +1393,9 @@ async function loadProcessDetail() {
     if (!processId) return;
     
     try {
-        const processRes = await db.collection('processes').doc(processId).get();
-        const processData = processRes.data;
-        
-        const detailRes = await db.collection('process_detail').doc(processData.detailId).get();
-        const detail = detailRes.data || {};
+        const res = await db.collection('processes').doc(processId).get();
+        const processData = res.data;
+        const detail = processData.detail || {};
         
         document.getElementById('process-title').value = detail.title || '';
         document.getElementById('process-subtitle').value = detail.subtitle || '';
@@ -1304,8 +1523,7 @@ async function saveProcessDetail() {
             tags: document.getElementById('process-tags').value.split(',').map(t => t.trim()).filter(t => t),
             content: document.getElementById('process-content').value,
             shareTitle: document.getElementById('process-share-title').value,
-            steps: window.currentSteps || [],
-            updateTime: Date.now()
+            steps: window.currentSteps || []
         };
         
         if (uploadedFiles['processHeroImage']) {
@@ -1326,7 +1544,7 @@ async function saveProcessDetail() {
 // ==================== 资料管理 ====================
 async function loadMaterials() {
     try {
-        const res = await db.collection('materials').orderBy('order', 'asc').get();
+        const res = await db.collection('materials').get();
         const materials = res.data || [];
         
         renderMaterialsTable(materials);
@@ -1411,26 +1629,17 @@ async function saveMaterial() {
             title: document.getElementById('material-edit-title').value,
             desc: document.getElementById('material-edit-desc').value,
             icon: document.getElementById('material-edit-icon').value,
-            order: parseInt(document.getElementById('material-edit-order').value) || 1,
-            updateTime: Date.now()
+            order: parseInt(document.getElementById('material-edit-order').value) || 1
         };
         
         if (id) {
             await db.collection('materials').doc(id).update(data);
         } else {
-            const materialId = 'material_' + Date.now();
-            data._id = materialId;
-            data.detailId = 'material_detail_' + Date.now();
-            data.createTime = Date.now();
-            
-            await db.collection('materials').add(data);
-            
-            await db.collection('material_detail').add({
-                _id: data.detailId,
-                materialId: materialId,
-                title: data.title,
+            // 新增资料（会同时创建详情）
+            data.detail = {
                 contentBlocks: []
-            });
+            };
+            await db.collection('materials').add(data);
         }
         
         closeModal('material-modal');
@@ -1450,14 +1659,7 @@ async function deleteMaterial(id) {
     try {
         showLoading(true);
         
-        const materialRes = await db.collection('materials').doc(id).get();
-        const materialData = materialRes.data;
-        
         await db.collection('materials').doc(id).remove();
-        
-        if (materialData && materialData.detailId) {
-            await db.collection('material_detail').doc(materialData.detailId).remove();
-        }
         
         loadMaterials();
         showToast('资料已删除');
@@ -1472,7 +1674,7 @@ async function deleteMaterial(id) {
 // ==================== 资料详情编辑 ====================
 async function loadMaterialDetailSelector() {
     try {
-        const res = await db.collection('materials').orderBy('order', 'asc').get();
+        const res = await db.collection('materials').get();
         const materials = res.data || [];
         
         const selector = document.getElementById('material-detail-selector');
@@ -1488,11 +1690,9 @@ async function loadMaterialDetail() {
     if (!materialId) return;
     
     try {
-        const materialRes = await db.collection('materials').doc(materialId).get();
-        const materialData = materialRes.data;
-        
-        const detailRes = await db.collection('material_detail').doc(materialData.detailId).get();
-        const detail = detailRes.data || {};
+        const res = await db.collection('materials').doc(materialId).get();
+        const materialData = res.data;
+        const detail = materialData.detail || {};
         
         document.getElementById('material-share-title').value = detail.shareTitle || '';
         
@@ -1642,6 +1842,7 @@ function moveMaterialBlock(index, direction) {
 
 function deleteMaterialBlock(index) {
     if (!window.currentMaterialContentBlocks) return;
+    
     window.currentMaterialContentBlocks.splice(index, 1);
     renderMaterialContentBlocks(window.currentMaterialContentBlocks);
 }
@@ -1659,8 +1860,10 @@ async function uploadMaterialBlockImage(blockIndex, input) {
             filePath: file
         });
         
+        const fileUrl = uploadRes.url || uploadRes.fileID;
+        
         if (window.currentMaterialContentBlocks && window.currentMaterialContentBlocks[blockIndex]) {
-            window.currentMaterialContentBlocks[blockIndex].value = uploadRes.fileID;
+            window.currentMaterialContentBlocks[blockIndex].value = fileUrl;
             renderMaterialContentBlocks(window.currentMaterialContentBlocks);
         }
         
@@ -1686,11 +1889,13 @@ async function uploadMaterialMultiBlockImage(blockIndex, imgIndex, input) {
             filePath: file
         });
         
+        const fileUrl = uploadRes.url || uploadRes.fileID;
+        
         if (window.currentMaterialContentBlocks && window.currentMaterialContentBlocks[blockIndex]) {
             if (!window.currentMaterialContentBlocks[blockIndex].value) {
                 window.currentMaterialContentBlocks[blockIndex].value = [];
             }
-            window.currentMaterialContentBlocks[blockIndex].value[imgIndex] = uploadRes.fileID;
+            window.currentMaterialContentBlocks[blockIndex].value[imgIndex] = fileUrl;
             renderMaterialContentBlocks(window.currentMaterialContentBlocks);
         }
         
@@ -1718,8 +1923,7 @@ async function saveMaterialDetail() {
         
         const data = {
             shareTitle: document.getElementById('material-share-title').value,
-            contentBlocks: window.currentMaterialContentBlocks || [],
-            updateTime: Date.now()
+            contentBlocks: window.currentMaterialContentBlocks || []
         };
         
         if (uploadedFiles['materialHeroImage']) {
@@ -1745,17 +1949,14 @@ async function handleImageUpload(input, key) {
     try {
         showLoading(true);
         
-        // 转换为blob
-        const blob = await fetch(URL.createObjectURL(file)).then(r => r.blob());
-        
         // 上传到云存储
         const path = `uploads/${Date.now()}_${file.name}`;
         const uploadRes = await app.uploadFile({
             cloudPath: path,
-            filePath: blob
+            filePath: file
         });
         
-        const fileUrl = uploadRes.fileID;
+        const fileUrl = uploadRes.url || uploadRes.fileID;
         
         // 保存到上传记录
         uploadedFiles[key] = fileUrl;
@@ -1780,17 +1981,14 @@ async function handleVideoUpload(input, key) {
     try {
         showLoading(true);
         
-        // 转换为blob
-        const blob = await fetch(URL.createObjectURL(file)).then(r => r.blob());
-        
         // 上传到云存储
         const path = `videos/${Date.now()}_${file.name}`;
         const uploadRes = await app.uploadFile({
             cloudPath: path,
-            filePath: blob
+            filePath: file
         });
         
-        const fileUrl = uploadRes.fileID;
+        const fileUrl = uploadRes.url || uploadRes.fileID;
         
         uploadedFiles[key] = fileUrl;
         
@@ -1915,7 +2113,7 @@ async function initGlobalConfig() {
         // 检查全局配置是否存在
         const res = await db.collection('config').doc('global').get();
         
-        if (res.data.length === 0) {
+        if (!res.data || !res.data._id) {
             // 创建默认配置
             await db.collection('config').add({
                 _id: 'global',
@@ -1923,7 +2121,7 @@ async function initGlobalConfig() {
                 backgroundImage: '',
                 backgroundVideo: '',
                 splash: {
-                    logo: 'WENJIE AIƎR',
+                    logo: 'WENJIE AIER',
                     subtitle: 'AI VIDEO PRODUCTION',
                     brandText: 'WEDDING PLANNING'
                 },
@@ -1955,7 +2153,7 @@ async function initGlobalConfig() {
     }
 }
 
-// 云开发初始化后调用
+// 云函数初始化后调用
 initCloud().then(() => {
     initGlobalConfig();
 });
