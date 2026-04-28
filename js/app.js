@@ -69,21 +69,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==================== 云开发初始化 ====================
 async function initCloud() {
     try {
-        // 初始化云开发
+        // 使用微信云开发Web SDK初始化
+        // 注意：需要在云开发控制台 → 设置 → 安全设置 中添加当前域名到Web SDK安全域名
+        
         app = cloudbase.init({
             env: 'cloud1-d7g8ol36z34e7a782'
         });
         
-        // 匿名登录
-        await app.auth().anonymousAuthProvider().signIn();
+        // 先检查是否已登录
+        const loginState = await app.auth().getLoginState();
+        
+        if (!loginState) {
+            // 未登录，尝试匿名登录
+            try {
+                await app.auth().anonymousAuthProvider().signIn();
+                console.log('匿名登录成功');
+            } catch (anonError) {
+                console.error('匿名登录失败，尝试自定义登录:', anonError);
+                // 如果匿名登录失败，可能需要自定义登录
+                showToast('请先在云开发控制台添加安全域名: wjaier.github.io', 'error');
+                return;
+            }
+        }
         
         // 获取数据库引用
         db = app.database();
         
         console.log('云开发初始化成功');
+        showToast('云开发连接成功');
     } catch (error) {
         console.error('云开发初始化失败:', error);
-        showToast('云开发连接失败，请检查网络', 'error');
+        showToast('云开发连接失败，请先在控制台添加安全域名', 'error');
     }
 }
 
