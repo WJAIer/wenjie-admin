@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问介AIer - 后台管理系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="login-page" class="page">
+        <div class="login-container">
+            <div class="login-box">
+                <div class="login-logo">
+                    <h1>WENJIE AIƎR</h1>
+                    <p>后台管理系统</p>
+                </div>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>管理员密码</label>
+                        <input type="password" id="password" placeholder="请输入管理员密码" required>
+                    </div>
+                    <button type="submit" class="btn-primary">登 录</button>
+                </form>
+                <div class="login-tip">
+                    <p>提示：首次使用请在云开发控制台初始化数据</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="main-page" class="page hidden">
+        <!-- 顶部导航 -->
+        <header class="header">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <h1 class="logo">WENJIE AIƎR</h1>
+            </div>
+            <div class="header-right">
+                <span class="env-badge">环境: cloud1-d7g8ol36z34e7a782</span>
+                <button class="btn-logout" onclick="logout()">退出登录</button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- 侧边栏 -->
+            <aside class="sidebar" id="sidebar">
+                <nav class="nav-menu">
+                    <a href="#" class="nav-item active" data-page="dashboard">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">仪表盘</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="splash">
+                        <span class="nav-icon">🚀</span>
+                        <span class="nav-text">启动页配置</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="home-config">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-text">首页配置</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="tabbar">
+                        <span class="nav-icon">📱</span>
+                        <span class="nav-text">底部导航栏</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="global">
+                        <span class="nav-icon">🎨</span>
+                        <span class="nav-text">全局背景</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="share">
+                        <span class="nav-icon">🔗</span>
+                        <span class="nav-text">分享配置</span>
+                    </a>
+                    
+                    <div class="nav-divider"></div>
+                    <div class="nav-group-title">内容管理</div>
+                    
+                    <a href="#" class="nav-item" data-page="cases">
+                        <span class="nav-icon">📁</span>
+                        <span class="nav-text">案例列表</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="case-detail">
+                        <span class="nav-icon">📄</span>
+                        <span class="nav-text">案例详情</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="processes">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-text">流程列表</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="process-detail">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">流程详情</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="materials">
+                        <span class="nav-icon">📚</span>
+                        <span class="nav-text">资料列表</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="material-detail">
+                        <span class="nav-icon">📑</span>
+                        <span class="nav-text">资料详情</span>
+                    </a>
+                </nav>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content" id="content">
+                <!-- 仪表盘 -->
+                <div class="content-page active" id="page-dashboard">
+                    <div class="page-header">
+                        <h2>仪表盘</h2>
+                    </div>
+                    <div class="dashboard-cards">
+                        <div class="dash-card">
+                            <div class="dash-icon">📁</div>
+                            <div class="dash-info">
+                                <span class="dash-num" id="case-count">0</span>
+                                <span class="dash-label">案例数量</span>
+                            </div>
+                        </div>
+                        <div class="dash-card">
+                            <div class="dash-icon">⚙️</div>
+                            <div class="dash-info">
+                                <span class="dash-num" id="process-count">0</span>
+                                <span class="dash-label">流程数量</span>
+                            </div>
+                        </div>
+                        <div class="dash-card">
+                            <div class="dash-icon">📚</div>
+                            <div class="dash-info">
+                                <span class="dash-num" id="material-count">0</span>
+                                <span class="dash-label">资料数量</span>
+                            </div>
+                        </div>
+                        <div class="dash-card">
+                            <div class="dash-icon">☁️</div>
+                            <div class="dash-info">
+                                <span class="dash-label">云存储</span>
+                                <span class="dash-text">已连接</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quick-actions">
+                        <h3>快捷操作</h3>
+                        <div class="action-btns">
+                            <button class="action-btn" onclick="navigateTo('cases')">+ 添加案例</button>
+                            <button class="action-btn" onclick="navigateTo('processes')">+ 添加流程</button>
+                            <button class="action-btn" onclick="navigateTo('materials')">+ 添加资料</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 启动页配置 -->
+                <div class="content-page" id="page-splash">
+                    <div class="page-header">
+                        <h2>启动页配置</h2>
+                        <button class="btn-primary" onclick="saveSplashConfig()">保存配置</button>
+                    </div>
+                    <div class="form-section">
+                        <h3>文字内容</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>LOGO文字</label>
+                                <input type="text" id="splash-logo" placeholder="WENJIE AIƎR">
+                            </div>
+                            <div class="form-group">
+                                <label>副标题</label>
+                                <input type="text" id="splash-subtitle" placeholder="AI VIDEO PRODUCTION">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>底部品牌文字</label>
+                                <input type="text" id="splash-brand" placeholder="WEDDING PLANNING">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>背景视频</h3>
+                        <div class="upload-area" id="splash-video-area">
+                            <input type="file" accept="video/mp4" id="splash-video-input" onchange="handleVideoUpload(this, 'splashVideo')">
+                            <div class="upload-placeholder">
+                                <span class="upload-icon">📹</span>
+                                <p>点击上传MP4视频</p>
+                                <p class="upload-tip">建议分辨率 1080x1920</p>
+                            </div>
+                            <div class="upload-preview hidden">
+                                <video id="splash-video-preview" controls></video>
+                                <button class="btn-remove" onclick="removeUpload('splashVideo')">移除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 首页配置 -->
+                <div class="content-page" id="page-home-config">
+                    <div class="page-header">
+                        <h2>首页配置</h2>
+                        <button class="btn-primary" onclick="saveHomeConfig()">保存配置</button>
+                    </div>
+                    <div class="form-section">
+                        <h3>品牌信息</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>品牌名称（英文）</label>
+                                <input type="text" id="home-brand-en" placeholder="WENJIE AIER">
+                            </div>
+                            <div class="form-group">
+                                <label>品牌名称（中文）</label>
+                                <input type="text" id="home-brand-cn" placeholder="问介AIer">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>服务项目</h3>
+                        <div id="services-list" class="sortable-list">
+                            <!-- 服务项目动态生成 -->
+                        </div>
+                        <button class="btn-secondary" onclick="addService()">+ 添加服务项目</button>
+                    </div>
+                </div>
+
+                <!-- 底部导航栏配置 -->
+                <div class="content-page" id="page-tabbar">
+                    <div class="page-header">
+                        <h2>底部导航栏配置</h2>
+                        <button class="btn-primary" onclick="saveTabBarConfig()">保存配置</button>
+                    </div>
+                    <div class="form-section">
+                        <h3>导航项配置</h3>
+                        <div id="tabbar-list" class="tabbar-editor">
+                            <!-- 导航项动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 全局背景配置 -->
+                <div class="content-page" id="page-global">
+                    <div class="page-header">
+                        <h2>全局背景配置</h2>
+                        <button class="btn-primary" onclick="saveGlobalConfig()">保存配置</button>
+                    </div>
+                    <div class="form-section">
+                        <h3>背景类型</h3>
+                        <div class="radio-group">
+                            <label class="radio-item">
+                                <input type="radio" name="bgType" value="image" checked onchange="toggleBgType('image')">
+                                <span>图片背景</span>
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="bgType" value="video" onchange="toggleBgType('video')">
+                                <span>视频背景</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-section" id="bg-image-section">
+                        <h3>背景图片</h3>
+                        <div class="upload-area" id="bg-image-area">
+                            <input type="file" accept="image/*" id="bg-image-input" onchange="handleImageUpload(this, 'backgroundImage')">
+                            <div class="upload-placeholder">
+                                <span class="upload-icon">🖼️</span>
+                                <p>点击上传背景图片</p>
+                                <p class="upload-tip">支持 JPG/PNG</p>
+                            </div>
+                            <div class="upload-preview hidden">
+                                <img id="bg-image-preview" src="" alt="背景预览">
+                                <button class="btn-remove" onclick="removeUpload('backgroundImage')">移除</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section hidden" id="bg-video-section">
+                        <h3>背景视频</h3>
+                        <div class="upload-area" id="bg-video-area">
+                            <input type="file" accept="video/mp4" id="bg-video-input" onchange="handleVideoUpload(this, 'backgroundVideo')">
+                            <div class="upload-placeholder">
+                                <span class="upload-icon">📹</span>
+                                <p>点击上传MP4视频</p>
+                                <p class="upload-tip">建议分辨率 1080x1920</p>
+                            </div>
+                            <div class="upload-preview hidden">
+                                <video id="bg-video-preview" controls></video>
+                                <button class="btn-remove" onclick="removeUpload('backgroundVideo')">移除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分享配置 -->
+                <div class="content-page" id="page-share">
+                    <div class="page-header">
+                        <h2>分享配置</h2>
+                        <button class="btn-primary" onclick="saveShareConfig()">保存配置</button>
+                    </div>
+                    <div class="form-section">
+                        <h3>全局默认分享</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>默认分享标题</label>
+                                <input type="text" id="share-default-title" placeholder="问介AIer - 用心记录每一份美好">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>默认分享封面</label>
+                            <div class="upload-area small" id="share-default-image-area">
+                                <input type="file" accept="image/*" id="share-default-image-input" onchange="handleImageUpload(this, 'shareDefaultImage')">
+                                <div class="upload-placeholder">
+                                    <span class="upload-icon">🖼️</span>
+                                    <p>点击上传封面</p>
+                                </div>
+                                <div class="upload-preview hidden">
+                                    <img id="share-default-image-preview" src="" alt="封面预览">
+                                    <button class="btn-remove" onclick="removeUpload('shareDefaultImage')">移除</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例列表 -->
+                <div class="content-page" id="page-cases">
+                    <div class="page-header">
+                        <h2>案例列表</h2>
+                        <button class="btn-primary" onclick="openCaseModal()">+ 添加案例</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="cases-table">
+                            <thead>
+                                <tr>
+                                    <th>排序</th>
+                                    <th>封面</th>
+                                    <th>标题</th>
+                                    <th>标签</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cases-tbody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 案例详情编辑 -->
+                <div class="content-page" id="page-case-detail">
+                    <div class="page-header">
+                        <h2>案例详情</h2>
+                        <div class="header-actions">
+                            <select id="case-detail-selector" class="select-control" onchange="loadCaseDetail()">
+                                <option value="">-- 选择案例 --</option>
+                            </select>
+                            <button class="btn-primary" onclick="saveCaseDetail()">保存</button>
+                        </div>
+                    </div>
+                    <div class="detail-editor" id="case-detail-editor">
+                        <div class="form-section">
+                            <h3>基本信息</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>主图（封面）</label>
+                                    <div class="upload-area small" id="case-hero-area">
+                                        <input type="file" accept="image/*" id="case-hero-input" onchange="handleImageUpload(this, 'caseHeroImage')">
+                                        <div class="upload-placeholder">
+                                            <span class="upload-icon">🖼️</span>
+                                            <p>点击上传主图</p>
+                                        </div>
+                                        <div class="upload-preview hidden">
+                                            <img id="case-hero-preview" src="" alt="主图预览">
+                                            <button class="btn-remove" onclick="removeUpload('caseHeroImage')">移除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>标题</label>
+                                    <input type="text" id="case-title" placeholder="案例标题">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>标签（逗号分隔）</label>
+                                <input type="text" id="case-tags" placeholder="婚礼, 视频, 摄影">
+                            </div>
+                            <div class="form-group">
+                                <label>简介</label>
+                                <textarea id="case-intro" rows="3" placeholder="案例简介"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>引用文字</label>
+                                <textarea id="case-quote" rows="2" placeholder="带左侧橙色竖线的引用文字"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h3>分享配置</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>分享标题</label>
+                                    <input type="text" id="case-share-title" placeholder="案例标题 - 问介AIer">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>分享封面</label>
+                                <div class="upload-area small" id="case-share-image-area">
+                                    <input type="file" accept="image/*" id="case-share-image-input" onchange="handleImageUpload(this, 'caseShareImage')">
+                                    <div class="upload-placeholder">
+                                        <span class="upload-icon">🖼️</span>
+                                        <p>点击上传分享封面</p>
+                                    </div>
+                                    <div class="upload-preview hidden">
+                                        <img id="case-share-image-preview" src="" alt="分享封面预览">
+                                        <button class="btn-remove" onclick="removeUpload('caseShareImage')">移除</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h3>内容块编辑</h3>
+                            <div id="content-blocks" class="content-blocks">
+                                <!-- 内容块动态生成 -->
+                            </div>
+                            <div class="block-toolbar">
+                                <button class="btn-tool" onclick="addContentBlock('text')">📝 文本</button>
+                                <button class="btn-tool" onclick="addContentBlock('h2')">📌 二级标题</button>
+                                <button class="btn-tool" onclick="addContentBlock('h3')">📍 三级标题</button>
+                                <button class="btn-tool" onclick="addContentBlock('image')">🖼️ 单图</button>
+                                <button class="btn-tool" onclick="addContentBlock('images2')">🖼️🖼️ 双图</button>
+                                <button class="btn-tool" onclick="addContentBlock('images3')">🖼️🖼️🖼️ 三图</button>
+                                <button class="btn-tool" onclick="addContentBlock('quote')">💬 引用</button>
+                                <button class="btn-tool" onclick="addContentBlock('divider')">➖ 分隔线</button>
+                                <button class="btn-tool" onclick="addContentBlock('spacer')">⬆️ 间距</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 流程列表 -->
+                <div class="content-page" id="page-processes">
+                    <div class="page-header">
+                        <h2>流程列表</h2>
+                        <button class="btn-primary" onclick="openProcessModal()">+ 添加流程</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="processes-table">
+                            <thead>
+                                <tr>
+                                    <th>排序</th>
+                                    <th>图标</th>
+                                    <th>标题</th>
+                                    <th>时长</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="processes-tbody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 流程详情编辑 -->
+                <div class="content-page" id="page-process-detail">
+                    <div class="page-header">
+                        <h2>流程详情</h2>
+                        <div class="header-actions">
+                            <select id="process-detail-selector" class="select-control" onchange="loadProcessDetail()">
+                                <option value="">-- 选择流程 --</option>
+                            </select>
+                            <button class="btn-primary" onclick="saveProcessDetail()">保存</button>
+                        </div>
+                    </div>
+                    <div class="detail-editor" id="process-detail-editor">
+                        <div class="form-section">
+                            <h3>基本信息</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>主图（封面）</label>
+                                    <div class="upload-area small" id="process-hero-area">
+                                        <input type="file" accept="image/*" id="process-hero-input" onchange="handleImageUpload(this, 'processHeroImage')">
+                                        <div class="upload-placeholder">
+                                            <span class="upload-icon">🖼️</span>
+                                            <p>点击上传主图</p>
+                                        </div>
+                                        <div class="upload-preview hidden">
+                                            <img id="process-hero-preview" src="" alt="主图预览">
+                                            <button class="btn-remove" onclick="removeUpload('processHeroImage')">移除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>主标题</label>
+                                    <input type="text" id="process-title" placeholder="流程标题">
+                                </div>
+                                <div class="form-group">
+                                    <label>副标题</label>
+                                    <input type="text" id="process-subtitle" placeholder="WEDDING PHOTOGRAPHY">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>标签（逗号分隔）</label>
+                                <input type="text" id="process-tags" placeholder="专业摄影, 全程记录">
+                            </div>
+                            <div class="form-group">
+                                <label>简介内容</label>
+                                <textarea id="process-content" rows="3" placeholder="流程简介"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>分享标题</label>
+                                <input type="text" id="process-share-title" placeholder="流程标题 - 问介AIer">
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h3>步骤编辑</h3>
+                            <div id="steps-list" class="steps-editor">
+                                <!-- 步骤动态生成 -->
+                            </div>
+                            <button class="btn-secondary" onclick="addStep()">+ 添加步骤</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 资料列表 -->
+                <div class="content-page" id="page-materials">
+                    <div class="page-header">
+                        <h2>资料列表</h2>
+                        <button class="btn-primary" onclick="openMaterialModal()">+ 添加资料</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="materials-table">
+                            <thead>
+                                <tr>
+                                    <th>排序</th>
+                                    <th>图标</th>
+                                    <th>标题</th>
+                                    <th>描述</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="materials-tbody">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 资料详情编辑 -->
+                <div class="content-page" id="page-material-detail">
+                    <div class="page-header">
+                        <h2>资料详情</h2>
+                        <div class="header-actions">
+                            <select id="material-detail-selector" class="select-control" onchange="loadMaterialDetail()">
+                                <option value="">-- 选择资料 --</option>
+                            </select>
+                            <button class="btn-primary" onclick="saveMaterialDetail()">保存</button>
+                        </div>
+                    </div>
+                    <div class="detail-editor" id="material-detail-editor">
+                        <div class="form-section">
+                            <h3>基本信息</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>主图（封面）</label>
+                                    <div class="upload-area small" id="material-hero-area">
+                                        <input type="file" accept="image/*" id="material-hero-input" onchange="handleImageUpload(this, 'materialHeroImage')">
+                                        <div class="upload-placeholder">
+                                            <span class="upload-icon">🖼️</span>
+                                            <p>点击上传主图</p>
+                                        </div>
+                                        <div class="upload-preview hidden">
+                                            <img id="material-hero-preview" src="" alt="主图预览">
+                                            <button class="btn-remove" onclick="removeUpload('materialHeroImage')">移除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>分享标题</label>
+                                <input type="text" id="material-share-title" placeholder="资料标题 - 问介AIer">
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h3>内容块编辑</h3>
+                            <div id="material-content-blocks" class="content-blocks">
+                                <!-- 内容块动态生成 -->
+                            </div>
+                            <div class="block-toolbar">
+                                <button class="btn-tool" onclick="addMaterialContentBlock('text')">📝 文本</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('h2')">📌 二级标题</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('h3')">📍 三级标题</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('image')">🖼️ 单图</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('images2')">🖼️🖼️ 双图</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('images3')">🖼️🖼️🖼️ 三图</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('quote')">💬 引用</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('divider')">➖ 分隔线</button>
+                                <button class="btn-tool" onclick="addMaterialContentBlock('spacer')">⬆️ 间距</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 模态框：案例编辑 -->
+    <div class="modal" id="case-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="case-modal-title">添加案例</h3>
+                <button class="modal-close" onclick="closeModal('case-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="case-edit-id">
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="case-edit-title" placeholder="案例标题">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="case-edit-desc" rows="2" placeholder="案例描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>标签（逗号分隔）</label>
+                    <input type="text" id="case-edit-tags" placeholder="婚礼, 视频">
+                </div>
+                <div class="form-group">
+                    <label>封面图片</label>
+                    <div class="upload-area small" id="case-edit-cover-area">
+                        <input type="file" accept="image/*" id="case-edit-cover-input" onchange="handleImageUpload(this, 'caseEditCover')">
+                        <div class="upload-placeholder">
+                            <span class="upload-icon">🖼️</span>
+                            <p>点击上传封面</p>
+                        </div>
+                        <div class="upload-preview hidden">
+                            <img id="case-edit-cover-preview" src="" alt="封面预览">
+                            <button class="btn-remove" onclick="removeUpload('caseEditCover')">移除</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>排序</label>
+                    <input type="number" id="case-edit-order" value="1" min="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('case-modal')">取消</button>
+                <button class="btn-primary" onclick="saveCase()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：流程编辑 -->
+    <div class="modal" id="process-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="process-modal-title">添加流程</h3>
+                <button class="modal-close" onclick="closeModal('process-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="process-edit-id">
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="process-edit-title" placeholder="流程标题">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="process-edit-desc" rows="2" placeholder="流程描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>图标</label>
+                    <select id="process-edit-icon" class="select-control">
+                        <option value="calendar">📅 日历</option>
+                        <option value="video">🎬 视频</option>
+                        <option value="music">🎵 音乐</option>
+                        <option value="camera">📷 相机</option>
+                        <option value="clock">⏰ 时钟</option>
+                        <option value="gift">🎁 礼物</option>
+                        <option value="heart">❤️ 爱心</option>
+                        <option value="ring">💍 戒指</option>
+                        <option value="flower">💐 花束</option>
+                        <option value="balloon">🎈 气球</option>
+                        <option value="cake">🎂 蛋糕</option>
+                        <option value="light">💡 灯光</option>
+                        <option value="mic">🎤 麦克风</option>
+                        <option value="note">📝 笔记</option>
+                        <option value="mail">📧 邮件</option>
+                        <option value="phone">📞 电话</option>
+                        <option value="location">📍 定位</option>
+                        <option value="share">🔗 分享</option>
+                        <option value="setting">⚙️ 设置</option>
+                        <option value="creative">🎨 创意</option>
+                        <option value="wedding">💒 婚礼</option>
+                        <option value="notice">📢 提醒</option>
+                        <option value="stage">🎭 舞台</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>时长</label>
+                        <input type="text" id="process-edit-duration" placeholder="7-15天">
+                    </div>
+                    <div class="form-group">
+                        <label>交付内容</label>
+                        <input type="text" id="process-edit-delivery" placeholder="交付内容">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>标语</label>
+                    <input type="text" id="process-edit-slogan" placeholder="宣传标语">
+                </div>
+                <div class="form-group">
+                    <label>排序</label>
+                    <input type="number" id="process-edit-order" value="1" min="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('process-modal')">取消</button>
+                <button class="btn-primary" onclick="saveProcess()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：资料编辑 -->
+    <div class="modal" id="material-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="material-modal-title">添加资料</h3>
+                <button class="modal-close" onclick="closeModal('material-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="material-edit-id">
+                <div class="form-group">
+                    <label>标题</label>
+                    <input type="text" id="material-edit-title" placeholder="资料标题">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea id="material-edit-desc" rows="2" placeholder="资料描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>图标</label>
+                    <select id="material-edit-icon" class="select-control">
+                        <option value="calendar">📅 日历</option>
+                        <option value="video">🎬 视频</option>
+                        <option value="music">🎵 音乐</option>
+                        <option value="camera">📷 相机</option>
+                        <option value="notice">📢 提醒</option>
+                        <option value="document">📄 文档</option>
+                        <option value="clock">⏰ 时钟</option>
+                        <option value="gift">🎁 礼物</option>
+                        <option value="heart">❤️ 爱心</option>
+                        <option value="ring">💍 戒指</option>
+                        <option value="flower">💐 花束</option>
+                        <option value="balloon">🎈 气球</option>
+                        <option value="cake">🎂 蛋糕</option>
+                        <option value="light">💡 灯光</option>
+                        <option value="mic">🎤 麦克风</option>
+                        <option value="note">📝 笔记</option>
+                        <option value="mail">📧 邮件</option>
+                        <option value="phone">📞 电话</option>
+                        <option value="location">📍 定位</option>
+                        <option value="share">🔗 分享</option>
+                        <option value="setting">⚙️ 设置</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>排序</label>
+                    <input type="number" id="material-edit-order" value="1" min="1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('material-modal')">取消</button>
+                <button class="btn-primary" onclick="saveMaterial()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast提示 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 云开发SDK -->
+    <script src="https://res.wx.qq.com/open/js/cloudbase@1.1.0/index.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
